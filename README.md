@@ -1,3 +1,5 @@
+# decrypt-pdf
+
 <!-- vscode-markdown-toc -->
 * [Install via Homebrew](#InstallviaHomebrew)
 * [Quick Start](#QuickStart)
@@ -15,7 +17,7 @@
 	numbering=false
 	autoSave=true
 	/vscode-markdown-toc-config -->
-<!-- /vscode-markdown-toc --># decrypt-pdf
+<!-- /vscode-markdown-toc -->
 
 A command-line tool that decrypts password-protected PDF files using a cascading
 strategy of tools: **qpdf**, **mutool**, and **ghostscript**. It tries each tool
@@ -24,16 +26,15 @@ for which PDF.
 
 This is **not** a password cracker. It assumes you already know the password.
 
-This also contains instructions on how how to install it as an Automator script
-and launch it via right-clicking on the file in Finder
-
-
-## <a name='InstallviaHomebrew'></a>Install via Homebrew
-
+The simplest way to use it through `homebrew`
 ```bash
 brew tap sdaas/tap
 brew install decrypt-pdf
 ```
+
+This also contains instructions on how how to install it as an Automator script
+and launch it via right-clicking on the file in Finder
+
 
 ## <a name='QuickStart'></a>Quick Start
 
