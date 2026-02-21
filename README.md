@@ -6,6 +6,7 @@
 	* [Exit Codes](#ExitCodes)
 * [Specifying the Password](#SpecifyingthePassword)
 * [Running Tests](#RunningTests)
+* [Automator Quick Action (macOS)](#AutomatorQuickActionmacOS)
 * [Design](#Design)
 * [TODO](#TODO)
 
@@ -21,6 +22,9 @@ in sequence until one succeeds — so you don't have to remember which tool work
 for which PDF.
 
 This is **not** a password cracker. It assumes you already know the password.
+
+This also contains instructions on how how to install it as an Automator script
+and launch it via right-clicking on the file in Finder
 
 
 ## <a name='QuickStart'></a>Quick Start
@@ -114,6 +118,37 @@ cp .env.example .env
 Tests that require the password will be skipped if `TEST_DECRYPT_PASSWORD` is
 not set. The `.env` file is gitignored and should never be committed.
 
+## <a name='AutomatorQuickActionmacOS'></a>Automator Quick Action (macOS)
+
+You can set up a macOS Quick Action so that you can right-click any PDF in Finder
+and decrypt it — no terminal required.
+
+### One-Time Setup
+
+1. Copy the decryption script into the workflow bundle:
+
+   ```bash
+   mkdir -p ~/Library/Services/"Decrypt PDF File.workflow"/Contents/
+   cp decrypt-pdf.sh ~/Library/Services/"Decrypt PDF File.workflow"/Contents/
+   ```
+
+2. Open **Automator** and select **Quick Action** as the document type.
+
+3. At the top, set **"Workflow receives current PDF files in Finder"**.
+
+4. From the actions library, drag **Run AppleScript** into the workflow.
+
+5. Replace the default script with the contents of
+   [`automator/decrypt-pdf.applescript`](automator/decrypt-pdf.applescript).
+
+6. **File > Save** and name it **"Decrypt PDF File"**.
+
+### How to Use
+
+Right-click a PDF in Finder > **Quick Actions** > **Decrypt PDF File**. A dialog
+will prompt for the password. The decrypted file appears in the same folder as
+`<filename>_decrypted.pdf`.
+
 ## <a name='Design'></a>Design
 
 See [design.md](design.md) for details on the decryption strategy, tool-specific
@@ -121,5 +156,10 @@ notes (qpdf, mutool, ghostscript), and the cascading workflow.
 
 ## <a name='TODO'></a>TODO
 
-- Automator integration for macOS 
+- ~~Automator integration for macOS~~ (done — see [Automator Quick Action](#AutomatorQuickActionmacOS))
 - Create and Publish Homebrew package
+
+
+
+
+

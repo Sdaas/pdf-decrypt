@@ -134,7 +134,21 @@ Notes
 - always use the `qpdf --show-encryption xxx.pdf` command for this. If the file is not
   password protected, this will return `File is not encrypted` 
 
-General Behavior
+## Automator Quick Action (macOS)
+
+A macOS Automator Quick Action allows users to right-click a PDF in Finder and
+decrypt it via a GUI dialog, without using the terminal.
+
+- The AppleScript lives in `automator/decrypt-pdf.applescript`
+- It locates `decrypt-pdf.sh` inside the workflow bundle at
+  `~/Library/Services/Decrypt PDF File.workflow/Contents/decrypt-pdf.sh`
+- Prompts the user for the password via `display dialog` with hidden input
+- Runs `decrypt-pdf.sh -q -p <password> <file>` for each selected PDF
+- Shows a success or failure alert after each file
+- Includes commented-out `display notification` calls for optional macOS
+  notification center support
+
+## General Behavior
 
 - provide a `--help` option so that the command line usage is clear
 - provide a `--verbose` mode. In this, all commands should be invoked with a "verbose" option so that user can see exactly what is happening.
