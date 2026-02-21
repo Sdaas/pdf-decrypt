@@ -11,18 +11,18 @@ This is **not** a password cracker. It assumes you already know the password.
 
 ```bash
 # Using the -p flag
-bash decrypt-pdf.sh -p 's3cret' document.pdf
+./decrypt-pdf.sh -p 's3cret' document.pdf
 
 # Using an environment variable
 export DECRYPT_PASSWORD='s3cret'
-bash decrypt-pdf.sh document.pdf
+./decrypt-pdf.sh document.pdf
 ```
 
 The decrypted file is written to `document_decrypted.pdf` by default, or you can
 specify an output path:
 
 ```bash
-bash decrypt-pdf.sh -p 's3cret' document.pdf /tmp/unlocked.pdf
+./decrypt-pdf.sh -p 's3cret' document.pdf /tmp/unlocked.pdf
 ```
 
 ## Dependencies
@@ -65,7 +65,7 @@ The password can be provided in two ways:
    Simple but visible in `ps` output and shell history.
 
    ```bash
-   bash decrypt-pdf.sh -p 's3cret' document.pdf
+   ./decrypt-pdf.sh -p 's3cret' document.pdf
    ```
 
 2. **`DECRYPT_PASSWORD` environment variable** — used as a fallback when `-p`
@@ -73,13 +73,13 @@ The password can be provided in two ways:
 
    ```bash
    export DECRYPT_PASSWORD='s3cret'
-   bash decrypt-pdf.sh document.pdf
+   ./decrypt-pdf.sh document.pdf
    ```
 
    Or inline for a single invocation:
 
    ```bash
-   DECRYPT_PASSWORD='s3cret' bash decrypt-pdf.sh document.pdf
+   DECRYPT_PASSWORD='s3cret' ./decrypt-pdf.sh document.pdf
    ```
 
 **Precedence:** `-p` flag > `DECRYPT_PASSWORD` env var > error.
@@ -92,7 +92,7 @@ cp .env.example .env
 # Edit .env and set TEST_DECRYPT_PASSWORD=<your-password>
 
 # 2. Run the test suite
-bash test-decrypt-pdf.sh
+./test-decrypt-pdf.sh
 ```
 
 Tests that require the password will be skipped if `TEST_DECRYPT_PASSWORD` is
