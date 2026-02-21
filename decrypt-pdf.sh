@@ -254,15 +254,23 @@ verify_decryption() {
         return 1
     fi
     # Reject empty or trivially small files (failed tools may create empty output)
-    # Also reject files much smaller than the input — a valid decryption should
-    # produce a file of comparable size, not a near-empty shell
-    local file_size input_size
+    local file_size
     file_size="$(wc -c < "$file")"
-    input_size="$(wc -c < "$INPUT_FILE")"
     if [[ "$file_size" -lt 100 ]]; then
+        log_verbose "Output file too small (${file_size} bytes)"
         return 1
     fi
-    # If output is less than 25% of input, it's likely a failed decryption
+    # Verify the output is actually a PDF
+    local header
+    header="$(head -c 5 "$file")"
+    if [[ "$header" != "%PDF-" ]]; then
+        log_verbose "Output file missing PDF header"
+        return 1
+    fi
+    # Reject outputs much smaller than input — tools like gs create valid but
+    # empty PDFs (~2-3KB) on wrong-password failures
+    local input_size
+    input_size="$(wc -c < "$INPUT_FILE")"
     if [[ "$input_size" -gt 0 && $((file_size * 4)) -lt "$input_size" ]]; then
         log_verbose "Output file suspiciously small (${file_size} bytes vs ${input_size} byte input)"
         return 1

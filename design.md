@@ -26,7 +26,7 @@ This works for **most** PDF files and should be the first thing to try
 `qpdf input.pdf --password='mypassword' output.pdf` 
 
 
-Sometimes the decryption fails because the PDF password are not simple strings. In 
+Sometimes the decryption fails because the PDF passwords are not simple strings. In 
 that case, use a hex-encoded version. First run
 
 `echo -n 'yourpassword' | xxd -p` 

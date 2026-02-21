@@ -304,7 +304,7 @@ test_wrong_password() {
     bash "$DECRYPT_SCRIPT" -p "definitely_wrong_password_12345" "$TEST_PDF" "$output_file" >/dev/null 2>&1 || rc=$?
     assert_exit_code "Wrong password exits with 1" 1 "$rc"
 
-    rm -f "$output_file"
+    rm -f "$output_file" "${TEST_PDF}.bak"
 }
 
 # ---------------------------------------------------------------------------
