@@ -1,4 +1,19 @@
-# decrypt-pdf
+<!-- vscode-markdown-toc -->
+* [Quick Start](#QuickStart)
+* [Dependencies](#Dependencies)
+* [Usage](#Usage)
+	* [Options](#Options)
+	* [Exit Codes](#ExitCodes)
+* [Specifying the Password](#SpecifyingthePassword)
+* [Running Tests](#RunningTests)
+* [Design](#Design)
+* [TODO](#TODO)
+
+<!-- vscode-markdown-toc-config
+	numbering=false
+	autoSave=true
+	/vscode-markdown-toc-config -->
+<!-- /vscode-markdown-toc --># decrypt-pdf
 
 A command-line tool that decrypts password-protected PDF files using a cascading
 strategy of tools: **qpdf**, **mutool**, and **ghostscript**. It tries each tool
@@ -7,7 +22,8 @@ for which PDF.
 
 This is **not** a password cracker. It assumes you already know the password.
 
-## Quick Start
+
+## <a name='QuickStart'></a>Quick Start
 
 ```bash
 # Using the -p flag
@@ -25,7 +41,7 @@ specify an output path:
 ./decrypt-pdf.sh -p 's3cret' document.pdf /tmp/unlocked.pdf
 ```
 
-## Dependencies
+## <a name='Dependencies'></a>Dependencies
 
 Install at least one (all three recommended):
 
@@ -35,13 +51,13 @@ brew install mupdf-tools
 brew install ghostscript
 ```
 
-## Usage
+## <a name='Usage'></a>Usage
 
 ```
-decrypt-pdf.sh [OPTIONS] -p PASSWORD INPUT_FILE [OUTPUT_FILE]
+decrypt-pdf.sh [OPTIONS] [-p PASSWORD] INPUT_FILE [OUTPUT_FILE]
 ```
 
-### Options
+### <a name='Options'></a>Options
 
 | Flag | Description |
 |------|-------------|
@@ -50,14 +66,14 @@ decrypt-pdf.sh [OPTIONS] -p PASSWORD INPUT_FILE [OUTPUT_FILE]
 | `--quiet`, `-q` | Suppress all output; rely on exit code and output file |
 | `-h`, `--help` | Show help message |
 
-### Exit Codes
+### <a name='ExitCodes'></a>Exit Codes
 
 | Code | Meaning |
 |------|---------|
 | 0 | Success (or file is already unencrypted) |
 | 1 | Failure |
 
-## Specifying the Password
+## <a name='SpecifyingthePassword'></a>Specifying the Password
 
 The password can be provided in two ways:
 
@@ -84,7 +100,7 @@ The password can be provided in two ways:
 
 **Precedence:** `-p` flag > `DECRYPT_PASSWORD` env var > error.
 
-## Running Tests
+## <a name='RunningTests'></a>Running Tests
 
 ```bash
 # 1. Create a .env file with the test password (see .env.example)
@@ -98,7 +114,12 @@ cp .env.example .env
 Tests that require the password will be skipped if `TEST_DECRYPT_PASSWORD` is
 not set. The `.env` file is gitignored and should never be committed.
 
-## Design
+## <a name='Design'></a>Design
 
 See [design.md](design.md) for details on the decryption strategy, tool-specific
 notes (qpdf, mutool, ghostscript), and the cascading workflow.
+
+## <a name='TODO'></a>TODO
+
+- Automator integration for macOS 
+- Create and Publish Homebrew package

@@ -4,7 +4,7 @@
 # strategy of tools: qpdf → mutool → ghostscript.
 #
 # Usage:
-#   decrypt-pdf.sh [--verbose | --quiet | -q] [--help] -p PASSWORD INPUT_FILE [OUTPUT_FILE]
+#   decrypt-pdf.sh [--verbose | --quiet | -q] [--help] [-p PASSWORD] INPUT_FILE [OUTPUT_FILE]
 #
 # Exit codes:
 #   0 — success (or file already unencrypted)
@@ -46,7 +46,9 @@ log_warn() {
 }
 
 log_error() {
-    echo -e "${COLOR_RED}[ERROR]${COLOR_RESET} $*" >&2
+    if [[ "$VERBOSITY" != "quiet" ]]; then
+        echo -e "${COLOR_RED}[ERROR]${COLOR_RESET} $*" >&2
+    fi
 }
 
 log_verbose() {
@@ -251,6 +253,20 @@ verify_decryption() {
     if [[ ! -f "$file" ]]; then
         return 1
     fi
+    # Reject empty or trivially small files (failed tools may create empty output)
+    # Also reject files much smaller than the input — a valid decryption should
+    # produce a file of comparable size, not a near-empty shell
+    local file_size input_size
+    file_size="$(wc -c < "$file")"
+    input_size="$(wc -c < "$INPUT_FILE")"
+    if [[ "$file_size" -lt 100 ]]; then
+        return 1
+    fi
+    # If output is less than 25% of input, it's likely a failed decryption
+    if [[ "$input_size" -gt 0 && $((file_size * 4)) -lt "$input_size" ]]; then
+        log_verbose "Output file suspiciously small (${file_size} bytes vs ${input_size} byte input)"
+        return 1
+    fi
     if ! is_encrypted "$file"; then
         return 0
     fi
@@ -281,6 +297,7 @@ try_qpdf_basic() {
     fi
 
     log_verbose "Running: ${cmd[*]}"
+    rm -f "$OUTPUT_FILE"
     run_tool "${cmd[@]}"
     verify_decryption "$OUTPUT_FILE"
 }
@@ -415,6 +432,11 @@ main() {
     check_already_unencrypted
     create_backup
     run_cascade
+    # Clean up backup on success — keep it on failure for debugging
+    if [[ -n "$BACKUP_FILE" && -f "$BACKUP_FILE" ]]; then
+        rm -f "$BACKUP_FILE"
+        log_verbose "Backup removed: ${BACKUP_FILE}"
+    fi
 }
 
 main "$@"

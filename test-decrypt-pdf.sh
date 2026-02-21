@@ -49,6 +49,7 @@ cleanup_tmp_files() {
     rm -f /tmp/test_decrypt_*.pdf
     rm -f /tmp/test_unencrypted*.pdf
     rm -f /tmp/test_unencrypted*.pdf.bak
+    rm -f "${TEST_PDF}.bak"
 }
 
 # ---------------------------------------------------------------------------
@@ -183,6 +184,31 @@ test_successful_decryption() {
     rm -f "$output_file"
 }
 
+test_env_var_password() {
+    echo "--- Test: DECRYPT_PASSWORD env var fallback ---"
+    if [[ -z "$TEST_PASSWORD" ]]; then
+        echo "  SKIP (TEST_DECRYPT_PASSWORD not set)"
+        return
+    fi
+    if [[ ! -f "$TEST_PDF" ]]; then
+        echo "  SKIP (test file ${TEST_PDF} not found)"
+        return
+    fi
+
+    local output_file="/tmp/test_decrypt_envvar.pdf"
+    local rc=0
+    DECRYPT_PASSWORD="$TEST_PASSWORD" bash "$DECRYPT_SCRIPT" "$TEST_PDF" "$output_file" >/dev/null 2>&1 || rc=$?
+    assert_exit_code "Env var password exits with 0" 0 "$rc"
+
+    if [[ -f "$output_file" ]]; then
+        pass "Output file created via env var password"
+    else
+        fail "Output file not created via env var password"
+    fi
+
+    rm -f "$output_file"
+}
+
 test_quiet_mode() {
     echo "--- Test: quiet mode ---"
     if [[ -z "$TEST_PASSWORD" ]]; then
@@ -230,6 +256,55 @@ test_default_output_filename() {
     else
         fail "Default output file not found at ${expected_output}"
     fi
+
+    rm -f "${TEST_PDF}.bak"
+}
+
+test_verbose_mode() {
+    echo "--- Test: verbose mode ---"
+    if [[ -z "$TEST_PASSWORD" ]]; then
+        echo "  SKIP (TEST_DECRYPT_PASSWORD not set)"
+        return
+    fi
+    if [[ ! -f "$TEST_PDF" ]]; then
+        echo "  SKIP (test file ${TEST_PDF} not found)"
+        return
+    fi
+
+    local output_file="/tmp/test_decrypt_verbose.pdf"
+    local output rc=0
+    output="$(bash "$DECRYPT_SCRIPT" --verbose -p "$TEST_PASSWORD" "$TEST_PDF" "$output_file" 2>&1)" || rc=$?
+    assert_exit_code "Verbose mode exits with 0" 0 "$rc"
+
+    if echo "$output" | grep -qE "\[DEBUG\]|Running:"; then
+        pass "Verbose mode produces debug output"
+    else
+        fail "Verbose mode missing debug output"
+    fi
+
+    rm -f "$output_file"
+}
+
+test_unknown_flag() {
+    echo "--- Test: unknown flag ---"
+    local rc=0
+    bash "$DECRYPT_SCRIPT" --invalid -p "test" /tmp/nonexistent.pdf >/dev/null 2>&1 || rc=$?
+    assert_exit_code "Unknown flag exits with 1" 1 "$rc"
+}
+
+test_wrong_password() {
+    echo "--- Test: wrong password ---"
+    if [[ ! -f "$TEST_PDF" ]]; then
+        echo "  SKIP (test file ${TEST_PDF} not found)"
+        return
+    fi
+
+    local output_file="/tmp/test_decrypt_wrongpw.pdf"
+    local rc=0
+    bash "$DECRYPT_SCRIPT" -p "definitely_wrong_password_12345" "$TEST_PDF" "$output_file" >/dev/null 2>&1 || rc=$?
+    assert_exit_code "Wrong password exits with 1" 1 "$rc"
+
+    rm -f "$output_file"
 }
 
 # ---------------------------------------------------------------------------
@@ -250,8 +325,12 @@ main() {
     test_non_pdf_file
     test_already_unencrypted
     test_successful_decryption
+    test_env_var_password
     test_quiet_mode
     test_default_output_filename
+    test_verbose_mode
+    test_unknown_flag
+    test_wrong_password
 
     cleanup_tmp_files
 

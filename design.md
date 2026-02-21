@@ -7,7 +7,7 @@
 	/vscode-markdown-toc-config -->
 <!-- /vscode-markdown-toc -->
 
-To create a command-line tool (and a Automator script) that can reliably open a 
+To create a command-line tool that can reliably open a
 password-protected PDF file. This is not a password cracker - it assumes that the 
 user knows the password
 
@@ -17,7 +17,7 @@ The most common command-line tools are
 - `qpdf`
 - `mupdf-tools`
 - `ghostscript`
-- `pdftk-java`
+- `pdftk-java` — evaluated but not included in the cascade; the other three tools cover all cases encountered so far
 
 ### QPDF
 
@@ -26,7 +26,7 @@ This works for **most** PDF files and should be the first thing to try
 `qpdf input.pdf --password='mypassword' output.pdf` 
 
 
-Sometimes the decryption fails becuase the PDF password are not simple strings. In 
+Sometimes the decryption fails because the PDF password are not simple strings. In 
 that case, use a hex-encoded version. First run
 
 `echo -n 'yourpassword' | xxd -p` 
@@ -85,15 +85,17 @@ The basic command is
 
 `mutool clean -p 'password' input.pdf output.pdf`
 
-### GhostSscript
+### Ghostscript
 
-bash
+```bash
 gs -sDEVICE=pdfwrite \
    -sOutputFile=output.pdf \
    -sPDFPassword='mypassword' \
    -dCompatibilityLevel=1.4 \
    -dNOPAUSE -dBATCH -dQUIET \
-   
+   input.pdf
+```
+
 
 Breakdown of the flags
 
@@ -102,8 +104,8 @@ Breakdown of the flags
 - `-sPDFPassword=mypassword` : the password
 - `-dNOPAUSE` : don't pause between pages. **IMPORTANT** `gs` pauses between pages by default
 - `-dBATCH` : exit after processing. By default `gs` stays in interactive mode
-- `-dQUIET` or `-q`: supress logs and output. run quietly
-- `-dCompatibilityLevel=1.4` : PDF compatibilty level. Lower versions are more compatible
+- `-dQUIET` or `-q`: suppress logs and output. run quietly
+- `-dCompatibilityLevel=1.4` : PDF compatibility level. Lower versions are more compatible
 and have simpler structure. higher versions support modern features like transparency, layers, etc.
     - `1.3` : Acrobat 4. Very old. avoid
     - `1.4` : Acrobat 5. Widely compatible
@@ -117,11 +119,15 @@ BTW, when we run `-sDEVICE=pdfwrite` Ghostscript is not actually "decrypting" th
 - Check if all dependencies are installed
 - Check if the file is actually encrypted
 - Create a backup copy of the file
-- First try the simple `qpdf` command 
-- Check the decryption succeeded
-- If not use `mutool`
-- If that still does not work use `gs` without specifying `CompatibilityLevel`
-- If that still does not work, use `gs` with `CompatiblityLevel` 1.4 (Acrobat 5) 
+- Try decryption using a 6-step cascade:
+  1. `qpdf` basic — simple password decryption
+  2. `qpdf` hex-encoded password — for non-ASCII or special passwords
+  3. `qpdf` advanced — decrypt + disable object-streams + linearize (fixes structural issues)
+  4. `mutool` — alternative tool with different PDF parser
+  5. `gs` without `CompatibilityLevel` — Ghostscript re-renders the PDF
+  6. `gs` with `CompatibilityLevel=1.4` — forces Acrobat 5 compatible output
+- After each step, verify decryption succeeded using `qpdf --show-encryption`
+- Stop at the first strategy that succeeds
 
 Notes
 - do not rely on the exit code to determine if the decryption succeeded
@@ -131,16 +137,18 @@ Notes
 General Behavior
 
 - provide a `--help` option so that the command line usage is clear
-- provide a `--verbose` mode. In this, all commmands should be invoked with a "verbose" option so that user can see exactly what is happening.
+- provide a `--verbose` mode. In this, all commands should be invoked with a "verbose" option so that user can see exactly what is happening.
 - provide a `--quiet` and `-q` option - where there is no output message. If the process
-succeeds a new decryptd file is created and program exits with code 0. A non 0 exit code
+succeeds a new decrypted file is created and program exits with code 0. A non 0 exit code
 signals some kind of error
-- if user does not specify eitehr quiet or verbose mode, then print some informational 
+- if user does not specify either quiet or verbose mode, then print some informational 
   messages
     - file is not encrypted
     - trying qpdf basic
-    - trying qpdf advanced
+    - trying qpdf with hex-encoded password
+    - trying qpdf advanced (decrypt + object-streams + linearize)
     - trying mutool
     - trying ghostscript
-    - decryption succeeded ( zero exit code)
-    - decruption failed ( non zero exit code)
+    - trying ghostscript with CompatibilityLevel=1.4
+    - decryption succeeded (zero exit code)
+    - decryption failed (non-zero exit code)
