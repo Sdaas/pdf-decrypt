@@ -1,0 +1,420 @@
+#!/usr/bin/env bash
+#
+# decrypt-pdf.sh — Decrypt a password-protected PDF file using a cascading
+# strategy of tools: qpdf → mutool → ghostscript.
+#
+# Usage:
+#   decrypt-pdf.sh [--verbose | --quiet | -q] [--help] -p PASSWORD INPUT_FILE [OUTPUT_FILE]
+#
+# Exit codes:
+#   0 — success (or file already unencrypted)
+#   1 — failure
+
+set -euo pipefail
+
+# ---------------------------------------------------------------------------
+# Constants
+# ---------------------------------------------------------------------------
+readonly SCRIPT_NAME="$(basename "$0")"
+readonly COLOR_GREEN="\033[0;32m"
+readonly COLOR_YELLOW="\033[0;33m"
+readonly COLOR_RED="\033[0;31m"
+readonly COLOR_RESET="\033[0m"
+
+# ---------------------------------------------------------------------------
+# Global state
+# ---------------------------------------------------------------------------
+VERBOSITY="normal"   # normal | verbose | quiet
+PASSWORD=""
+INPUT_FILE=""
+OUTPUT_FILE=""
+BACKUP_FILE=""
+
+# ---------------------------------------------------------------------------
+# Logging helpers
+# ---------------------------------------------------------------------------
+log_info() {
+    if [[ "$VERBOSITY" != "quiet" ]]; then
+        echo -e "${COLOR_GREEN}[INFO]${COLOR_RESET} $*"
+    fi
+}
+
+log_warn() {
+    if [[ "$VERBOSITY" != "quiet" ]]; then
+        echo -e "${COLOR_YELLOW}[WARN]${COLOR_RESET} $*" >&2
+    fi
+}
+
+log_error() {
+    echo -e "${COLOR_RED}[ERROR]${COLOR_RESET} $*" >&2
+}
+
+log_verbose() {
+    if [[ "$VERBOSITY" == "verbose" ]]; then
+        echo -e "[DEBUG] $*"
+    fi
+}
+
+# ---------------------------------------------------------------------------
+# Usage / help
+# ---------------------------------------------------------------------------
+print_usage() {
+    cat <<EOF
+Usage: ${SCRIPT_NAME} [OPTIONS] -p PASSWORD INPUT_FILE [OUTPUT_FILE]
+
+Decrypt a password-protected PDF file.
+
+Options:
+  -p PASSWORD       Password for the encrypted PDF
+  --verbose         Show detailed output from decryption tools
+  --quiet, -q       Suppress all output; rely on exit code and output file
+  -h, --help        Show this help message and exit
+
+Password:
+  The password can be supplied via -p flag or the DECRYPT_PASSWORD environment
+  variable. The -p flag takes precedence. At least one must be provided.
+
+Arguments:
+  INPUT_FILE        Path to the encrypted PDF file
+  OUTPUT_FILE       Path for the decrypted output (default: INPUT_FILE_decrypted.pdf)
+
+Exit codes:
+  0  Success (or file is already unencrypted)
+  1  Failure
+
+Examples:
+  ${SCRIPT_NAME} -p 's3cret' document.pdf
+  ${SCRIPT_NAME} -p 's3cret' document.pdf /tmp/unlocked.pdf
+  ${SCRIPT_NAME} --verbose -p 's3cret' document.pdf
+  ${SCRIPT_NAME} -q -p 's3cret' document.pdf decrypted.pdf
+  DECRYPT_PASSWORD='s3cret' ${SCRIPT_NAME} document.pdf
+EOF
+}
+
+# ---------------------------------------------------------------------------
+# Argument parsing
+# ---------------------------------------------------------------------------
+parse_args() {
+    while [[ $# -gt 0 ]]; do
+        case "$1" in
+            -h|--help)
+                print_usage
+                exit 0
+                ;;
+            --verbose)
+                VERBOSITY="verbose"
+                shift
+                ;;
+            --quiet|-q)
+                VERBOSITY="quiet"
+                shift
+                ;;
+            -p)
+                if [[ $# -lt 2 ]]; then
+                    log_error "Option -p requires a PASSWORD argument."
+                    exit 1
+                fi
+                PASSWORD="$2"
+                shift 2
+                ;;
+            -*)
+                log_error "Unknown option: $1"
+                print_usage >&2
+                exit 1
+                ;;
+            *)
+                # Positional arguments: INPUT_FILE then OUTPUT_FILE
+                if [[ -z "$INPUT_FILE" ]]; then
+                    INPUT_FILE="$1"
+                elif [[ -z "$OUTPUT_FILE" ]]; then
+                    OUTPUT_FILE="$1"
+                else
+                    log_error "Unexpected argument: $1"
+                    print_usage >&2
+                    exit 1
+                fi
+                shift
+                ;;
+        esac
+    done
+
+    # Fall back to DECRYPT_PASSWORD env var if -p was not provided
+    if [[ -z "$PASSWORD" && -n "${DECRYPT_PASSWORD:-}" ]]; then
+        PASSWORD="$DECRYPT_PASSWORD"
+    fi
+
+    # Validate required args
+    if [[ -z "$PASSWORD" ]]; then
+        log_error "Password is required. Use -p PASSWORD or set DECRYPT_PASSWORD env var."
+        print_usage >&2
+        exit 1
+    fi
+    if [[ -z "$INPUT_FILE" ]]; then
+        log_error "Input file is required."
+        print_usage >&2
+        exit 1
+    fi
+
+    # Default output file
+    if [[ -z "$OUTPUT_FILE" ]]; then
+        local base dir ext
+        dir="$(dirname "$INPUT_FILE")"
+        base="$(basename "$INPUT_FILE" .pdf)"
+        ext="pdf"
+        OUTPUT_FILE="${dir}/${base}_decrypted.${ext}"
+    fi
+}
+
+# ---------------------------------------------------------------------------
+# Dependency checking
+# ---------------------------------------------------------------------------
+check_dependencies() {
+    local has_qpdf=false has_mutool=false has_gs=false
+
+    if command -v qpdf &>/dev/null; then has_qpdf=true; fi
+    if command -v mutool &>/dev/null; then has_mutool=true; fi
+    if command -v gs &>/dev/null; then has_gs=true; fi
+
+    log_verbose "qpdf=$has_qpdf  mutool=$has_mutool  gs=$has_gs"
+
+    if ! $has_qpdf; then log_warn "qpdf is not installed — some strategies will be skipped."; fi
+    if ! $has_mutool; then log_warn "mutool is not installed — some strategies will be skipped."; fi
+    if ! $has_gs; then log_warn "gs (Ghostscript) is not installed — some strategies will be skipped."; fi
+
+    if ! $has_qpdf && ! $has_mutool && ! $has_gs; then
+        log_error "No decryption tools found. Install at least one of: qpdf, mupdf-tools, ghostscript."
+        exit 1
+    fi
+}
+
+# ---------------------------------------------------------------------------
+# Input validation
+# ---------------------------------------------------------------------------
+validate_input() {
+    if [[ ! -f "$INPUT_FILE" ]]; then
+        log_error "File not found: ${INPUT_FILE}"
+        exit 1
+    fi
+
+    # Quick PDF magic-byte check
+    local header
+    header="$(head -c 5 "$INPUT_FILE")"
+    if [[ "$header" != "%PDF-" ]]; then
+        log_error "File does not appear to be a PDF: ${INPUT_FILE}"
+        exit 1
+    fi
+}
+
+# ---------------------------------------------------------------------------
+# Encryption check via qpdf
+# ---------------------------------------------------------------------------
+is_encrypted() {
+    # Returns 0 if encrypted, 1 if not encrypted or qpdf unavailable
+    local file="$1"
+    if ! command -v qpdf &>/dev/null; then
+        # Cannot determine; assume encrypted
+        return 0
+    fi
+    local output
+    output="$(qpdf --show-encryption "$file" 2>&1)" || true
+    if echo "$output" | grep -q "File is not encrypted"; then
+        return 1
+    fi
+    return 0
+}
+
+check_already_unencrypted() {
+    if ! is_encrypted "$INPUT_FILE"; then
+        log_info "File is not encrypted: ${INPUT_FILE}"
+        exit 0
+    fi
+}
+
+# ---------------------------------------------------------------------------
+# Backup
+# ---------------------------------------------------------------------------
+create_backup() {
+    BACKUP_FILE="${INPUT_FILE}.bak"
+    if [[ ! -f "$BACKUP_FILE" ]]; then
+        cp "$INPUT_FILE" "$BACKUP_FILE"
+        log_verbose "Backup created: ${BACKUP_FILE}"
+    else
+        log_verbose "Backup already exists: ${BACKUP_FILE}"
+    fi
+}
+
+# ---------------------------------------------------------------------------
+# Verification — check if the output file is a valid unencrypted PDF
+# ---------------------------------------------------------------------------
+verify_decryption() {
+    local file="$1"
+    if [[ ! -f "$file" ]]; then
+        return 1
+    fi
+    if ! is_encrypted "$file"; then
+        return 0
+    fi
+    return 1
+}
+
+# ---------------------------------------------------------------------------
+# Run a command, suppressing output in quiet mode
+# ---------------------------------------------------------------------------
+run_tool() {
+    if [[ "$VERBOSITY" == "quiet" ]]; then
+        "$@" &>/dev/null || true
+    else
+        "$@" 2>&1 || true
+    fi
+}
+
+# ---------------------------------------------------------------------------
+# Decryption strategies
+# ---------------------------------------------------------------------------
+try_qpdf_basic() {
+    if ! command -v qpdf &>/dev/null; then return 1; fi
+    log_info "Trying qpdf basic..."
+
+    local -a cmd=(qpdf "$INPUT_FILE" "--password=${PASSWORD}" "$OUTPUT_FILE")
+    if [[ "$VERBOSITY" == "verbose" ]]; then
+        cmd+=(--verbose --progress)
+    fi
+
+    log_verbose "Running: ${cmd[*]}"
+    run_tool "${cmd[@]}"
+    verify_decryption "$OUTPUT_FILE"
+}
+
+try_qpdf_hex() {
+    if ! command -v qpdf &>/dev/null; then return 1; fi
+    if ! command -v xxd &>/dev/null; then return 1; fi
+    log_info "Trying qpdf with hex-encoded password..."
+
+    local hex_password
+    hex_password="$(echo -n "$PASSWORD" | xxd -p | tr -d '\n')"
+
+    local -a cmd=(qpdf "$INPUT_FILE" "--password=${hex_password}" --password-is-hex-key "$OUTPUT_FILE")
+    if [[ "$VERBOSITY" == "verbose" ]]; then
+        cmd+=(--verbose --progress)
+    fi
+
+    log_verbose "Running: ${cmd[*]}"
+    rm -f "$OUTPUT_FILE"
+    run_tool "${cmd[@]}"
+    verify_decryption "$OUTPUT_FILE"
+}
+
+try_qpdf_advanced() {
+    if ! command -v qpdf &>/dev/null; then return 1; fi
+    log_info "Trying qpdf advanced (decrypt + object-streams + linearize)..."
+
+    local -a cmd=(qpdf "$INPUT_FILE" "--password=${PASSWORD}" --decrypt --object-streams=disable --linearize "$OUTPUT_FILE")
+    if [[ "$VERBOSITY" == "verbose" ]]; then
+        cmd+=(--verbose --progress)
+    fi
+
+    log_verbose "Running: ${cmd[*]}"
+    rm -f "$OUTPUT_FILE"
+    run_tool "${cmd[@]}"
+    verify_decryption "$OUTPUT_FILE"
+}
+
+try_mutool() {
+    if ! command -v mutool &>/dev/null; then return 1; fi
+    log_info "Trying mutool..."
+
+    log_verbose "Running: mutool clean -p '***' ${INPUT_FILE} ${OUTPUT_FILE}"
+    rm -f "$OUTPUT_FILE"
+    run_tool mutool clean -p "$PASSWORD" "$INPUT_FILE" "$OUTPUT_FILE"
+    verify_decryption "$OUTPUT_FILE"
+}
+
+try_gs_basic() {
+    if ! command -v gs &>/dev/null; then return 1; fi
+    log_info "Trying ghostscript..."
+
+    local -a cmd=(gs -sDEVICE=pdfwrite
+        "-sOutputFile=${OUTPUT_FILE}"
+        "-sPDFPassword=${PASSWORD}"
+        -dNOPAUSE -dBATCH)
+    if [[ "$VERBOSITY" != "verbose" ]]; then
+        cmd+=(-dQUIET)
+    fi
+    cmd+=("$INPUT_FILE")
+
+    log_verbose "Running: ${cmd[*]}"
+    rm -f "$OUTPUT_FILE"
+    run_tool "${cmd[@]}"
+    verify_decryption "$OUTPUT_FILE"
+}
+
+try_gs_compat14() {
+    if ! command -v gs &>/dev/null; then return 1; fi
+    log_info "Trying ghostscript with CompatibilityLevel=1.4..."
+
+    local -a cmd=(gs -sDEVICE=pdfwrite
+        "-sOutputFile=${OUTPUT_FILE}"
+        "-sPDFPassword=${PASSWORD}"
+        -dCompatibilityLevel=1.4
+        -dNOPAUSE -dBATCH)
+    if [[ "$VERBOSITY" != "verbose" ]]; then
+        cmd+=(-dQUIET)
+    fi
+    cmd+=("$INPUT_FILE")
+
+    log_verbose "Running: ${cmd[*]}"
+    rm -f "$OUTPUT_FILE"
+    run_tool "${cmd[@]}"
+    verify_decryption "$OUTPUT_FILE"
+}
+
+# ---------------------------------------------------------------------------
+# Main cascade
+# ---------------------------------------------------------------------------
+run_cascade() {
+    local strategies=(
+        try_qpdf_basic
+        try_qpdf_hex
+        try_qpdf_advanced
+        try_mutool
+        try_gs_basic
+        try_gs_compat14
+    )
+
+    for strategy in "${strategies[@]}"; do
+        if "$strategy"; then
+            log_info "Decryption succeeded. Output: ${OUTPUT_FILE}"
+            return 0
+        fi
+        # Clean up failed output
+        rm -f "$OUTPUT_FILE"
+    done
+
+    log_error "All decryption strategies failed."
+    return 1
+}
+
+# ---------------------------------------------------------------------------
+# Cleanup on unexpected exit — remove partial output files
+# ---------------------------------------------------------------------------
+cleanup_on_exit() {
+    local exit_code=$?
+    if [[ $exit_code -ne 0 && -n "$OUTPUT_FILE" && -f "$OUTPUT_FILE" ]]; then
+        rm -f "$OUTPUT_FILE"
+    fi
+}
+trap cleanup_on_exit EXIT
+
+# ---------------------------------------------------------------------------
+# Entry point
+# ---------------------------------------------------------------------------
+main() {
+    parse_args "$@"
+    check_dependencies
+    validate_input
+    check_already_unencrypted
+    create_backup
+    run_cascade
+}
+
+main "$@"
