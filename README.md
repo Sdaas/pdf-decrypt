@@ -1,4 +1,5 @@
 <!-- vscode-markdown-toc -->
+* [Install via Homebrew](#InstallviaHomebrew)
 * [Quick Start](#QuickStart)
 * [Dependencies](#Dependencies)
 * [Usage](#Usage)
@@ -27,22 +28,29 @@ This also contains instructions on how how to install it as an Automator script
 and launch it via right-clicking on the file in Finder
 
 
+## <a name='InstallviaHomebrew'></a>Install via Homebrew
+
+```bash
+brew tap sdaas/tap
+brew install decrypt-pdf
+```
+
 ## <a name='QuickStart'></a>Quick Start
 
 ```bash
 # Using the -p flag
-./decrypt-pdf.sh -p 's3cret' document.pdf
+./decrypt-pdf -p 's3cret' document.pdf
 
 # Using an environment variable
 export DECRYPT_PASSWORD='s3cret'
-./decrypt-pdf.sh document.pdf
+./decrypt-pdf document.pdf
 ```
 
 The decrypted file is written to `document_decrypted.pdf` by default, or you can
 specify an output path:
 
 ```bash
-./decrypt-pdf.sh -p 's3cret' document.pdf /tmp/unlocked.pdf
+./decrypt-pdf -p 's3cret' document.pdf /tmp/unlocked.pdf
 ```
 
 ## <a name='Dependencies'></a>Dependencies
@@ -58,7 +66,7 @@ brew install ghostscript
 ## <a name='Usage'></a>Usage
 
 ```
-decrypt-pdf.sh [OPTIONS] [-p PASSWORD] INPUT_FILE [OUTPUT_FILE]
+decrypt-pdf [OPTIONS] [-p PASSWORD] INPUT_FILE [OUTPUT_FILE]
 ```
 
 ### <a name='Options'></a>Options
@@ -85,7 +93,7 @@ The password can be provided in two ways:
    Simple but visible in `ps` output and shell history.
 
    ```bash
-   ./decrypt-pdf.sh -p 's3cret' document.pdf
+   ./decrypt-pdf -p 's3cret' document.pdf
    ```
 
 2. **`DECRYPT_PASSWORD` environment variable** — used as a fallback when `-p`
@@ -93,13 +101,13 @@ The password can be provided in two ways:
 
    ```bash
    export DECRYPT_PASSWORD='s3cret'
-   ./decrypt-pdf.sh document.pdf
+   ./decrypt-pdf document.pdf
    ```
 
    Or inline for a single invocation:
 
    ```bash
-   DECRYPT_PASSWORD='s3cret' ./decrypt-pdf.sh document.pdf
+   DECRYPT_PASSWORD='s3cret' ./decrypt-pdf document.pdf
    ```
 
 **Precedence:** `-p` flag > `DECRYPT_PASSWORD` env var > error.
@@ -129,7 +137,7 @@ and decrypt it — no terminal required.
 
    ```bash
    mkdir -p ~/Library/Services/"Decrypt PDF File.workflow"/Contents/
-   cp decrypt-pdf.sh ~/Library/Services/"Decrypt PDF File.workflow"/Contents/
+   cp decrypt-pdf ~/Library/Services/"Decrypt PDF File.workflow"/Contents/
    ```
 
 2. Open **Automator** and select **Quick Action** as the document type.
@@ -157,7 +165,7 @@ notes (qpdf, mutool, ghostscript), and the cascading workflow.
 ## <a name='TODO'></a>TODO
 
 - ~~Automator integration for macOS~~ (done — see [Automator Quick Action](#AutomatorQuickActionmacOS))
-- Create and Publish Homebrew package
+- ~~Create and Publish Homebrew package~~ (done — see [Install via Homebrew](#InstallviaHomebrew))
 
 
 

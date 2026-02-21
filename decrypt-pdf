@@ -1,10 +1,10 @@
 #!/usr/bin/env bash
 #
-# decrypt-pdf.sh — Decrypt a password-protected PDF file using a cascading
+# decrypt-pdf — Decrypt a password-protected PDF file using a cascading
 # strategy of tools: qpdf → mutool → ghostscript.
 #
 # Usage:
-#   decrypt-pdf.sh [--verbose | --quiet | -q] [--help] [-p PASSWORD] INPUT_FILE [OUTPUT_FILE]
+#   decrypt-pdf [--verbose | --quiet | -q] [--help] [-p PASSWORD] INPUT_FILE [OUTPUT_FILE]
 #
 # Exit codes:
 #   0 — success (or file already unencrypted)

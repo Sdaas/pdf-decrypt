@@ -140,13 +140,21 @@ A macOS Automator Quick Action allows users to right-click a PDF in Finder and
 decrypt it via a GUI dialog, without using the terminal.
 
 - The AppleScript lives in `automator/decrypt-pdf.applescript`
-- It locates `decrypt-pdf.sh` inside the workflow bundle at
-  `~/Library/Services/Decrypt PDF File.workflow/Contents/decrypt-pdf.sh`
+- It locates `decrypt-pdf` inside the workflow bundle at
+  `~/Library/Services/Decrypt PDF File.workflow/Contents/decrypt-pdf`
 - Prompts the user for the password via `display dialog` with hidden input
-- Runs `decrypt-pdf.sh -q -p <password> <file>` for each selected PDF
+- Runs `decrypt-pdf -q -p <password> <file>` for each selected PDF
 - Shows a success or failure alert after each file
 - Includes commented-out `display notification` calls for optional macOS
   notification center support
+
+## Homebrew Packaging
+
+The tool is distributed via a Homebrew tap (`sdaas/tap`). The formula lives in
+`Formula/decrypt-pdf.rb` in this repo and is mirrored to the
+`homebrew-tap` repository. It downloads a tarball from a GitHub release, installs
+the `decrypt-pdf` script into the Homebrew `bin/` directory, and declares
+`qpdf`, `mupdf-tools`, and `ghostscript` as dependencies.
 
 ## General Behavior
 

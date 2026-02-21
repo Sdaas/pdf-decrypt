@@ -1,12 +1,12 @@
 #!/usr/bin/env bash
 #
-# test-decrypt-pdf.sh — Tests for decrypt-pdf.sh
+# test-decrypt-pdf.sh — Tests for decrypt-pdf
 #
 
 set -euo pipefail
 
 readonly SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
-readonly DECRYPT_SCRIPT="${SCRIPT_DIR}/decrypt-pdf.sh"
+readonly DECRYPT_SCRIPT="${SCRIPT_DIR}/decrypt-pdf"
 readonly TEST_PDF="${SCRIPT_DIR}/test-data/jyoti.pdf"
 
 # Load .env if present (provides TEST_DECRYPT_PASSWORD)
@@ -312,7 +312,7 @@ test_wrong_password() {
 # ---------------------------------------------------------------------------
 main() {
     echo "========================================="
-    echo " decrypt-pdf.sh — Test Suite"
+    echo " decrypt-pdf — Test Suite"
     echo "========================================="
     echo ""
 

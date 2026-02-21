@@ -5,9 +5,9 @@
 -- workflow so that users can right-click a PDF in Finder and decrypt it.
 --
 -- Setup:
---   1. Copy decrypt-pdf.sh into the workflow bundle:
+--   1. Copy decrypt-pdf into the workflow bundle:
 --        mkdir -p ~/Library/Services/"Decrypt PDF File.workflow"/Contents/
---        cp decrypt-pdf.sh ~/Library/Services/"Decrypt PDF File.workflow"/Contents/
+--        cp decrypt-pdf ~/Library/Services/"Decrypt PDF File.workflow"/Contents/
 --   2. Open Automator, create a new "Quick Action"
 --   3. Set "Workflow receives current PDF files in Finder"
 --   4. Add a "Run AppleScript" action and paste this script
@@ -17,14 +17,14 @@
 --   Right-click a PDF in Finder > Quick Actions > Decrypt PDF File
 
 on run {input, parameters}
-	-- Locate decrypt-pdf.sh bundled inside the workflow
-	set scriptPath to (path to home folder as text) & "Library:Services:Decrypt PDF File.workflow:Contents:decrypt-pdf.sh"
+	-- Locate decrypt-pdf bundled inside the workflow
+	set scriptPath to (path to home folder as text) & "Library:Services:Decrypt PDF File.workflow:Contents:decrypt-pdf"
 	set posixScriptPath to POSIX path of scriptPath
 
 	-- Verify the script exists
 	tell application "System Events"
 		if not (exists file scriptPath) then
-			display alert "decrypt-pdf.sh not found" message "Expected at:" & return & posixScriptPath buttons {"OK"} default button "OK" as critical
+			display alert "decrypt-pdf not found" message "Expected at:" & return & posixScriptPath buttons {"OK"} default button "OK" as critical
 			return input
 		end if
 	end tell
